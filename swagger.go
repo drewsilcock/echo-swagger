@@ -65,7 +65,7 @@ func EchoWrapHandler(confs ...func(c *Config)) echo.HandlerFunc {
 
 		switch path {
 		case "":
-			return c.Redirect(http.StatusPermanentRedirect, prefix + "/index.html")
+			fallthrough
 		case "index.html":
 			index.Execute(c.Response().Writer, config)
 		case config.URL:
