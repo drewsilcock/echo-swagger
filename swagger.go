@@ -80,7 +80,8 @@ func EchoWrapHandler(confs ...func(c *Config)) echo.HandlerFunc {
 			if err != nil {
 				return echo.NewHTTPError(http.StatusInternalServerError, err)
 			}
-			return c.JSON(http.StatusOK, doc)
+			c.Response().Header().Set("Content-Type", "application/json")
+			c.Response().Write([]byte(doc))
 		default:
 			handler.ServeHTTP(c.Response().Writer, c.Request())
 		}
