@@ -1,0 +1,10 @@
+.idea
+
+.vscode
+
+*.swp
+*.swo
+.*.swp
+.*.swo
+*~
+.*~
