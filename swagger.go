@@ -12,8 +12,17 @@ import (
 
 // Config stores echoSwagger configuration variables.
 type Config struct {
-	//The url pointing to API definition (normally swagger.json or swagger.yaml). Default is `doc.json`.
+	// The url pointing to API definition (normally swagger.json or swagger.yaml). Default is `doc.json`.
 	URL string
+
+	// The information for OAuth2 integration, if any.
+	OAuth *OAuthConfig
+}
+
+type OAuthConfig struct {
+	ClientId string
+	Realm string
+	AppName string
 }
 
 // URL presents the url pointing to API definition (normally swagger.json or swagger.yaml).
@@ -28,7 +37,6 @@ var WrapHandler = EchoWrapHandler()
 
 // EchoWrapHandler wraps `http.Handler` into `echo.HandlerFunc`.
 func EchoWrapHandler(confs ...func(c *Config)) echo.HandlerFunc {
-
 	handler := swaggerFiles.Handler
 
 	config := &Config{
@@ -52,7 +60,6 @@ func EchoWrapHandler(confs ...func(c *Config)) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var matches []string
 		if matches = re.FindStringSubmatch(c.Request().RequestURI); len(matches) != 3 {
-
 			return c.String(http.StatusNotFound, "404 page not found")
 		}
 		path := matches[2]
@@ -60,15 +67,18 @@ func EchoWrapHandler(confs ...func(c *Config)) echo.HandlerFunc {
 		handler.Prefix = prefix
 
 		switch path {
+		case "":
+			return c.Redirect(http.StatusPermanentRedirect, prefix + "/index.html")
 		case "index.html":
-
 			index.Execute(c.Response().Writer, config)
-		case "doc.json":
-			doc, _ := swag.ReadDoc()
-			c.Response().Write([]byte(doc))
+		case config.URL:
+			doc, err := swag.ReadDoc()
+			if err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, err)
+			}
+			return c.JSON(http.StatusOK, doc)
 		default:
 			handler.ServeHTTP(c.Response().Writer, c.Request())
-
 		}
 
 		return nil
@@ -162,6 +172,14 @@ window.onload = function() {
     ],
     layout: "StandaloneLayout"
   })
+
+  {{if .OAuth != nil}}
+  ui.initOAuth({
+    clientId: "{{.OAuth.ClientId}}",
+    realm: "{{.OAuth.Realm}}",
+    appName: "{{.OAuth.AppName}}"
+  })
+  {{end}}
 
   window.ui = ui
 }
