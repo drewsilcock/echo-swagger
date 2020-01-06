@@ -55,10 +55,6 @@ func EchoWrapHandler(confs ...func(c *Config)) echo.HandlerFunc {
 		log.Fatal("Unable to parse template for echo-swagger.")
 	}
 
-	type pro struct {
-		Host string
-	}
-
 	return func(c echo.Context) error {
 		prefix, path := path.Split(c.Request().RequestURI)
 		handler.Prefix = prefix
