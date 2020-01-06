@@ -2,6 +2,7 @@ package echoSwagger
 
 import (
 	"html/template"
+	"log"
 	"net/http"
 	"regexp"
 
@@ -49,7 +50,10 @@ func EchoWrapHandler(confs ...func(c *Config)) echo.HandlerFunc {
 
 	// create a template with name
 	t := template.New("swagger_index.html")
-	index, _ := t.Parse(indexTempl)
+	index, err := t.Parse(indexTempl)
+	if err != nil {
+		log.Fatal("Unable to parse template for echo-swagger.")
+	}
 
 	type pro struct {
 		Host string
@@ -173,7 +177,7 @@ window.onload = function() {
     layout: "StandaloneLayout"
   })
 
-  {{if .OAuth != nil}}
+  {{if .OAuth}}
   ui.initOAuth({
     clientId: "{{.OAuth.ClientId}}",
     realm: "{{.OAuth.Realm}}",
