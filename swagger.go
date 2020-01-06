@@ -4,7 +4,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"regexp"
+	"path"
 
 	"github.com/labstack/echo/v4"
 	"github.com/swaggo/files"
