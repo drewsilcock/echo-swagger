@@ -13,23 +13,36 @@ import (
 
 // Config stores echoSwagger configuration variables.
 type Config struct {
-	// The url pointing to API definition (normally swagger.json or swagger.yaml). Default is `doc.json`.
-	URL string
+	// If the Swagger specification JSON document is external to the web server, this should be set to the full URL
+	// to the specification document.
+	ExternalURL *string
 
 	// The information for OAuth2 integration, if any.
 	OAuth *OAuthConfig
 }
 
+// Configuration for Swagger UI OAuth2 integration. See
+// https://swagger.io/docs/open-source-tools/swagger-ui/usage/oauth2/ for further details.
 type OAuthConfig struct {
+	// The ID of the client sent to the OAuth2 IAM provider.
 	ClientId string
+
+	// The OAuth2 realm that the client should operate in. If not applicable, use empty string.
 	Realm string
+
+	// The name to display for the application in the authentication popup.
 	AppName string
+}
+
+type templateData struct {
+	SwaggerSpecFullURL string
+	Config
 }
 
 // URL presents the url pointing to API definition (normally swagger.json or swagger.yaml).
 func URL(url string) func(c *Config) {
 	return func(c *Config) {
-		c.URL = url
+		c.ExternalURL = &url
 	}
 }
 
@@ -40,9 +53,7 @@ var WrapHandler = EchoWrapHandler()
 func EchoWrapHandler(confs ...func(c *Config)) echo.HandlerFunc {
 	handler := swaggerFiles.Handler
 
-	config := &Config{
-		URL: "doc.json",
-	}
+	config := &Config{}
 
 	for _, c := range confs {
 		c(config)
@@ -52,25 +63,39 @@ func EchoWrapHandler(confs ...func(c *Config)) echo.HandlerFunc {
 	t := template.New("swagger_index.html")
 	index, err := t.Parse(indexTempl)
 	if err != nil {
-		log.Fatal("Unable to parse template for echo-swagger.")
+		log.Fatal("Unable to parse index.html template for echo-swagger:", err)
 	}
 
 	return func(c echo.Context) error {
-		prefix, path := path.Split(c.Request().RequestURI)
+		prefix, pathFile := path.Split(c.Request().RequestURI)
 		handler.Prefix = prefix
 
-		switch path {
+		templateData := templateData{
+			SwaggerSpecFullURL: path.Join(prefix, "doc.json"),
+			Config:             *config,
+		}
+
+		if config.ExternalURL != nil {
+			// Configuration specifies override for Swagger specification URL.
+			templateData.SwaggerSpecFullURL = *config.ExternalURL
+		}
+
+		switch pathFile {
 		case "":
 			fallthrough
 		case "index.html":
-			index.Execute(c.Response().Writer, config)
-		case config.URL:
+			if err := index.Execute(c.Response().Writer, templateData); err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, err)
+			}
+		case "doc.json":
 			doc, err := swag.ReadDoc()
 			if err != nil {
 				return echo.NewHTTPError(http.StatusInternalServerError, err)
 			}
 			c.Response().Header().Set("Content-Type", "application/json")
-			c.Response().Write([]byte(doc))
+			if _, err := c.Response().Write([]byte(doc)); err != nil {
+				return echo.NewHTTPError(http.StatusInternalServerError, err)
+			}
 		default:
 			handler.ServeHTTP(c.Response().Writer, c.Request())
 		}
@@ -154,7 +179,7 @@ const indexTempl = `<!-- HTML for static distribution bundle build -->
 window.onload = function() {
   // Build a system
   const ui = SwaggerUIBundle({
-    url: "{{.URL}}",
+    url: "{{.SwaggerSpecFullURL}}",
     dom_id: '#swagger-ui',
     validatorUrl: null,
     presets: [
